@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔐 Reseller License Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        /* Login Card */
+        .login-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 400px;
+            margin: 0 auto;
+            display: block;
+        }
+
+        .dashboard-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            display: none;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 28px;
+        }
+
+        h2 i {
+            margin-right: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .key-generator {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .key-generator h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .key-display {
+            background: #333;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 18px;
+            margin: 15px 0;
+            word-break: break-all;
+            text-align: center;
+        }
+
+        .copy-btn {
+            background: #28a745;
+            margin-top: 0;
+        }
+
+        .copy-btn:hover {
+            background: #218838;
+        }
+
+        .keys-table {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            margin-top: 20px;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+
+        .info-text {
+            text-align: center;
+            color: #666;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .info-text a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .info-text a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Login Card -->
+        <div id="loginCard" class="login-card">
+            <h2>🔐 Reseller Login</h2>
+            <div id="loginError" class="error-message"></div>
+            <div class="form-group">
+                <label>Reseller Token</label>
+                <input type="text" id="tokenInput" placeholder="Enter your reseller token">
+            </div>
+            <button onclick="login()">Login to Dashboard</button>
+            <div class="info-text">
+                <small>Contact @admin for a reseller token</small>
+            </div>
+        </div>
+
+        <!-- Dashboard Card -->
+        <div id="dashboardCard" class="dashboard-card">
+            <h2>📊 Reseller Dashboard</h2>
+            <div id="dashboardError" class="error-message"></div>
+            <div id="dashboardSuccess" class="success-message"></div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="keysCreated">0</div>
+                    <div class="stat-label">Keys Created</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="maxKeys">0</div>
+                    <div class="stat-label">Max Keys</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="keysLeft">0</div>
+                    <div class="stat-label">Keys Left</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="expiryDate">-</div>
+                    <div class="stat-label">Panel Expires</div>
+                </div>
+            </div>
+
+            <!-- Key Generator -->
+            <div class="key-generator">
+                <h3>🎯 Generate New License Key</h3>
+                <div class="form-group">
+                    <label>Days Valid</label>
+                    <select id="daysSelect">
+                        <option value="7">7 Days</option>
+                        <option value="30" selected>30 Days</option>
+                        <option value="60">60 Days</option>
+                        <option value="90">90 Days</option>
+                        <option value="180">180 Days</option>
+                        <option value="365">365 Days</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Max Devices</label>
+                    <select id="devicesSelect">
+                        <option value="1">1 Device</option>
+                        <option value="2">2 Devices</option>
+                        <option value="3" selected>3 Devices</option>
+                        <option value="5">5 Devices</option>
+                        <option value="10">10 Devices</option>
+                    </select>
+                </div>
+                <button onclick="generateKey()" id="generateBtn">🚀 Generate Key</button>
+                <div id="generatedKey" class="key-display" style="display: none;"></div>
+                <button id="copyBtn" class="copy-btn" style="display: none;" onclick="copyKey()">📋 Copy Key</button>
+            </div>
+
+            <!-- Keys Table -->
+            <h3>📋 Your Keys</h3>
+            <div class="keys-table">
+                <table id="keysTable">
+                    <thead>
+                        <tr>
+                            <th>License Key</th>
+                            <th>Expires</th>
+                            <th>Devices</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="keysTableBody">
+                        <tr>
+                            <td colspan="4" style="text-align: center;">Loading keys...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+        </div>
+    </div>
+
+    <script>
+        // API Base URL - CHANGE THIS TO YOUR RENDER URL
+        const API_BASE_URL = 'https://license-server-jmsn.onrender.com';
+        
+        let resellerToken = '';
+        let username = '';
+
+        // Login function
+        async function login() {
+            const token = document.getElementById('tokenInput').value.trim();
+            
+            if (!token) {
+                showError('loginError', 'Please enter your token');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/reseller/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ token: token })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    resellerToken = token;
+                    username = data.username;
+                    
+                    // Update stats
+                    document.getElementById('keysCreated').textContent = data.keys_created;
+                    document.getElementById('maxKeys').textContent = data.max_keys;
+                    document.getElementById('keysLeft').textContent = data.max_keys - data.keys_created;
+                    
+                    // Format expiry date
+                    const expiryDate = new Date(data.expires);
+                    document.getElementById('expiryDate').textContent = expiryDate.toLocaleDateString();
+
+                    // Hide login, show dashboard
+                    document.getElementById('loginCard').style.display = 'none';
+                    document.getElementById('dashboardCard').style.display = 'block';
+
+                    // Load keys
+                    loadKeys();
+                } else {
+                    showError('loginError', data.error || 'Login failed');
+                }
+            } catch (error) {
+                showError('loginError', 'Connection error. Please try again.');
+            }
+        }
+
+        // Generate key
+        async function generateKey() {
+            const days = document.getElementById('daysSelect').value;
+            const devices = document.getElementById('devicesSelect').value;
+
+            document.getElementById('generateBtn').disabled = true;
+            document.getElementById('generateBtn').textContent = '⏳ Generating...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/reseller/create_key`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        token: resellerToken,
+                        days: parseInt(days),
+                        max_devices: parseInt(devices)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Show the generated key
+                    document.getElementById('generatedKey').textContent = data.key;
+                    document.getElementById('generatedKey').style.display = 'block';
+                    document.getElementById('copyBtn').style.display = 'block';
+                    
+                    // Show success message
+                    showSuccess('dashboardSuccess', '✅ Key generated successfully!');
+                    
+                    // Refresh keys list
+                    loadKeys();
+                    
+                    // Update stats
+                    document.getElementById('keysCreated').textContent = 
+                        parseInt(document.getElementById('keysCreated').textContent) + 1;
+                    document.getElementById('keysLeft').textContent = 
+                        parseInt(document.getElementById('keysLeft').textContent) - 1;
+                } else {
+                    showError('dashboardError', data.error || 'Failed to generate key');
+                }
+            } catch (error) {
+                showError('dashboardError', 'Connection error. Please try again.');
+            }
+
+            document.getElementById('generateBtn').disabled = false;
+            document.getElementById('generateBtn').textContent = '🚀 Generate Key';
+        }
+
+        // Load all keys
+        async function loadKeys() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/reseller/list_keys`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ token: resellerToken })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const tbody = document.getElementById('keysTableBody');
+                    
+                    if (data.keys.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No keys generated yet</td></tr>';
+                        return;
+                    }
+
+                    let html = '';
+                    data.keys.forEach(key => {
+                        const expiryDate = new Date(key.expires);
+                        const now = new Date();
+                        const status = expiryDate > now ? 
+                            '<span class="badge badge-success">Active</span>' : 
+                            '<span class="badge badge-warning">Expired</span>';
+                        
+                        html += `<tr>
+                            <td><code>${key.key}</code></td>
+                            <td>${expiryDate.toLocaleDateString()}</td>
+                            <td>${key.devices_used}/${key.max_devices}</td>
+                            <td>${status}</td>
+                        </tr>`;
+                    });
+                    
+                    tbody.innerHTML = html;
+                }
+            } catch (error) {
+                console.error('Failed to load keys:', error);
+            }
+        }
+
+        // Copy key to clipboard
+        function copyKey() {
+            const key = document.getElementById('generatedKey').textContent;
+            navigator.clipboard.writeText(key).then(() => {
+                showSuccess('dashboardSuccess', '📋 Key copied to clipboard!');
+            });
+        }
+
+        // Logout
+        function logout() {
+            resellerToken = '';
+            username = '';
+            document.getElementById('tokenInput').value = '';
+            document.getElementById('loginCard').style.display = 'block';
+            document.getElementById('dashboardCard').style.display = 'none';
+            document.getElementById('generatedKey').style.display = 'none';
+            document.getElementById('copyBtn').style.display = 'none';
+        }
+
+        // Helper functions
+        function showError(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.style.display = 'block';
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 5000);
+        }
+
+        function showSuccess(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.style.display = 'block';
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 3000);
+        }
+
+        // Check if token exists in URL (for direct login links)
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            if (token) {
+                document.getElementById('tokenInput').value = token;
+                login();
+            }
+        };
+    </script>
+</body>
+</html>
