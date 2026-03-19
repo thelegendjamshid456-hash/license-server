@@ -8,7 +8,7 @@ import logging
 
 app = FastAPI()
 
-# Set up logging
+# Set up detailed logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -23,15 +23,18 @@ app.add_middleware(
 keys_db = {}
 
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
-    """Log EVERY request details"""
+async def log_all_requests(request: Request, call_next):
+    """Log EVERY single request with full details"""
     body = await request.body()
-    logger.info("="*50)
-    logger.info(f"URL: {request.url.path}")
-    logger.info(f"Method: {request.method}")
-    logger.info(f"Headers: {dict(request.headers)}")
-    logger.info(f"Body: {body.decode('utf-8', errors='ignore')}")
-    logger.info("="*50)
+    logger.info("="*60)
+    logger.info(f"🔥 NEW REQUEST DETECTED!")
+    logger.info(f"📌 Full URL: {request.url}")
+    logger.info(f"📌 Path: {request.url.path}")
+    logger.info(f"📌 Method: {request.method}")
+    logger.info(f"📌 Headers: {dict(request.headers)}")
+    logger.info(f"📌 Query Params: {dict(request.query_params)}")
+    logger.info(f"📌 Body: {body.decode('utf-8', errors='ignore')}")
+    logger.info("="*60)
     
     response = await call_next(request)
     return response
@@ -40,7 +43,8 @@ async def log_requests(request: Request, call_next):
 async def validate_key(request: Request):
     """Log the raw request first"""
     body = await request.body()
-    logger.info(f"🔍 RAW VALIDATE REQUEST: {body.decode('utf-8', errors='ignore')}")
+    logger.info(f"🔍 VALIDATE ENDPOINT HIT")
+    logger.info(f"📦 Raw body: {body.decode('utf-8', errors='ignore')}")
     
     # Try to parse as JSON
     try:
@@ -90,6 +94,7 @@ async def create_key(data: dict):
         'devices': []
     }
     
+    # Return in the format your admin panel expects
     return {
         "key": key,
         "expires": expires.isoformat(),
@@ -117,9 +122,18 @@ async def config():
 
 @app.get("/")
 async def root():
+    logger.info("🔍 ROOT endpoint hit")
     return {"message": "MVP License Server Running", "status": "ok"}
+
+@app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def catch_all_paths(path_name: str, request: Request):
+    """Catch literally anything else"""
+    body = await request.body()
+    logger.info(f"🔄 WILDCARD CATCH - Path: {path_name}")
+    logger.info(f"📦 Body: {body.decode('utf-8', errors='ignore')}")
+    return {"status": "ok", "message": "Caught by wildcard"}
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 10000))
     uvicorn.run(app, host="0.0.0.0", port=port)
