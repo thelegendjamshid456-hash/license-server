@@ -1,139 +1,178 @@
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-import secrets
-from datetime import datetime, timedelta
+from flask import Flask, request, jsonify
+import sqlite3
 import os
-import json
-import logging
+from datetime import datetime
 
-app = FastAPI()
+app = Flask(__name__)
 
-# Set up detailed logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# IMPORTANT: This should match your Reseller database structure
+# For Render, we need to sync data from your local DB
+DB_PATH = '/tmp/glass_license.db'  # Render uses /tmp for writable files
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Store keys in memory
-keys_db = {}
-
-@app.middleware("http")
-async def log_all_requests(request: Request, call_next):
-    """Log EVERY single request with full details"""
-    body = await request.body()
-    logger.info("="*60)
-    logger.info(f"🔥 NEW REQUEST DETECTED!")
-    logger.info(f"📌 Full URL: {request.url}")
-    logger.info(f"📌 Path: {request.url.path}")
-    logger.info(f"📌 Method: {request.method}")
-    logger.info(f"📌 Headers: {dict(request.headers)}")
-    logger.info(f"📌 Query Params: {dict(request.query_params)}")
-    logger.info(f"📌 Body: {body.decode('utf-8', errors='ignore')}")
-    logger.info("="*60)
+def init_db():
+    """Create the same database structure as your Reseller panel"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
     
-    response = await call_next(request)
-    return response
-
-@app.post("/api/validate")
-async def validate_key(request: Request):
-    """Log the raw request first"""
-    body = await request.body()
-    logger.info(f"🔍 VALIDATE ENDPOINT HIT")
-    logger.info(f"📦 Raw body: {body.decode('utf-8', errors='ignore')}")
+    # Licenses table - match your Reseller panel exactly
+    c.execute('''CREATE TABLE IF NOT EXISTS licenses
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  license_key TEXT UNIQUE,
+                  reseller_id INTEGER,
+                  customer_email TEXT,
+                  license_type TEXT DEFAULT 'DAY',
+                  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                  expires_at DATETIME,
+                  is_active BOOLEAN DEFAULT 1,
+                  device_limit INTEGER DEFAULT 10000)''')
     
-    # Try to parse as JSON
+    # Devices table - track devices per license
+    c.execute('''CREATE TABLE IF NOT EXISTS devices
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  license_key TEXT,
+                  device_id TEXT,
+                  first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+                  last_seen DATETIME,
+                  FOREIGN KEY (license_key) REFERENCES licenses (license_key))''')
+    
+    conn.commit()
+    conn.close()
+    print("✅ Database initialized on Render")
+
+# Call this when server starts
+init_db()
+
+# ============================================
+# API ENDPOINTS FOR GLASS ENGINE APP
+# ============================================
+
+@app.route('/verify', methods=['POST'])
+def verify_license():
+    """Main endpoint that Glass Engine calls to verify licenses"""
+    data = request.get_json()
+    print(f"📦 Verify request: {data}")
+    
+    license_key = data.get('license_key') or data.get('key') or data.get('license')
+    device_id = data.get('device_id') or data.get('hardware_id') or data.get('device') or 'unknown'
+    
+    if not license_key:
+        return jsonify({"error": "No license key"}), 400
+    
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    # Check if license exists and is active
+    c.execute("SELECT * FROM licenses WHERE license_key = ? AND is_active = 1", (license_key,))
+    license = c.fetchone()
+    
+    if not license:
+        conn.close()
+        return jsonify({
+            "valid": False,
+            "error": "Invalid license key"
+        }), 403
+    
+    # Check expiration
+    expires_at = datetime.strptime(license['expires_at'], '%Y-%m-%d %H:%M:%S')
+    if expires_at < datetime.now():
+        conn.close()
+        return jsonify({
+            "valid": False,
+            "error": "License expired"
+        }), 403
+    
+    # Check device limit
+    c.execute("SELECT COUNT(*) as count FROM devices WHERE license_key = ?", (license_key,))
+    device_count = c.fetchone()['count']
+    
+    # Check if this device is already registered
+    c.execute("SELECT * FROM devices WHERE license_key = ? AND device_id = ?", 
+             (license_key, device_id))
+    existing_device = c.fetchone()
+    
+    if not existing_device and device_count >= license['device_limit']:
+        conn.close()
+        return jsonify({
+            "valid": False,
+            "error": f"Device limit reached ({license['device_limit']})"
+        }), 403
+    
+    # Register or update device
+    if existing_device:
+        c.execute("UPDATE devices SET last_seen = datetime('now') WHERE license_key = ? AND device_id = ?",
+                 (license_key, device_id))
+    else:
+        c.execute("INSERT INTO devices (license_key, device_id, first_seen, last_seen) VALUES (?, ?, datetime('now'), datetime('now'))",
+                 (license_key, device_id))
+    
+    conn.commit()
+    conn.close()
+    
+    # Return success in format Glass Engine expects
+    return jsonify({
+        "success": True,
+        "valid": True,
+        "status": "active",
+        "license_key": license_key,
+        "expires": license['expires_at'],
+        "device_limit": license['device_limit'],
+        "devices_used": device_count + (0 if existing_device else 1),
+        "features": ["all", "premium", "pro"]
+    })
+
+@app.route('/api/license', methods=['POST'])
+def api_license():
+    """Alternative endpoint that Glass Engine might use"""
+    return verify_license()
+
+@app.route('/validate', methods=['POST'])
+def validate():
+    """Another common endpoint"""
+    return verify_license()
+
+# ============================================
+# API ENDPOINTS FOR YOUR RESELLER PANEL
+# ============================================
+
+@app.route('/api/sync_license', methods=['POST'])
+def sync_license():
+    """Called by your Reseller panel when new licenses are generated"""
+    data = request.get_json()
+    admin_token = data.get('admin_token')
+    
+    # Simple security - you can change this
+    if admin_token != "2b969f6736b5b93e495c6ea65acb9216":
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    license_key = data.get('license_key')
+    email = data.get('customer_email')
+    license_type = data.get('license_type', 'DAY')
+    expires_at = data.get('expires_at')
+    device_limit = data.get('device_limit', 10000)
+    
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
     try:
-        data = json.loads(body)
-        logger.info(f"📦 Parsed JSON: {data}")
-        
-        license_key = data.get("license_key", "")
-        device_id = data.get("device_id", "")
-        
-        logger.info(f"🔑 License Key: {license_key}")
-        logger.info(f"📱 Device ID: {device_id}")
-        
-        # FOR MVP APK - Return EXACT format they expect
-        return {
-            "status": "success",
-            "data": {
-                "auth_token": secrets.token_hex(16),
-                "expiry_date": (datetime.now() + timedelta(days=30)).isoformat(),
-                "version": "1.0",
-                "license_key": license_key,
-                "max_devices": 3,
-                "active_devices": 1
-            }
-        }
+        c.execute("""
+            INSERT INTO licenses (license_key, customer_email, license_type, expires_at, device_limit)
+            VALUES (?, ?, ?, ?, ?)
+        """, (license_key, email, license_type, expires_at, device_limit))
+        conn.commit()
+        return jsonify({"success": True, "message": "License synced to Render"})
     except Exception as e:
-        logger.error(f"❌ Error parsing request: {e}")
-        return {"status": "error", "message": "Invalid request"}
+        return jsonify({"error": str(e)}), 400
+    finally:
+        conn.close()
 
-@app.post("/api/admin/create_key")
-async def create_key(data: dict):
-    days = data.get("days", 30)
-    max_devices = data.get("max_devices", 3)
-    
-    # Generate key like: A1B2-C3D4-E5F6-G7H8
-    key = ''
-    chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-    for i in range(16):
-        key += chars[secrets.randbelow(len(chars))]
-        if (i + 1) % 4 == 0 and i < 15:
-            key += '-'
-    
-    expires = datetime.now() + timedelta(days=days)
-    
-    keys_db[key] = {
-        'expires': expires,
-        'max_devices': max_devices,
-        'devices': []
-    }
-    
-    # Return in the format your admin panel expects
-    return {
-        "key": key,
-        "expires": expires.isoformat(),
-        "max_devices": max_devices
-    }
+@app.route('/')
+def home():
+    return jsonify({
+        "status": "Glass Engine License Server",
+        "version": "1.0",
+        "endpoints": ["/verify", "/api/license", "/validate", "/api/sync_license"]
+    })
 
-@app.post("/api/verify")
-async def verify(request: Request):
-    """Catch any other verify endpoints"""
-    body = await request.body()
-    logger.info(f"🔍 VERIFY endpoint hit: {body.decode('utf-8', errors='ignore')}")
-    return {"status": "valid"}
-
-@app.post("/api/license")
-async def license(request: Request):
-    """Catch license endpoints"""
-    body = await request.body()
-    logger.info(f"🔍 LICENSE endpoint hit: {body.decode('utf-8', errors='ignore')}")
-    return {"status": "valid"}
-
-@app.get("/api/config")
-async def config():
-    logger.info("🔍 CONFIG endpoint hit")
-    return {"config": {}}
-
-@app.get("/")
-async def root():
-    logger.info("🔍 ROOT endpoint hit")
-    return {"message": "MVP License Server Running", "status": "ok"}
-
-@app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE"])
-async def catch_all_paths(path_name: str, request: Request):
-    """Catch literally anything else"""
-    body = await request.body()
-    logger.info(f"🔄 WILDCARD CATCH - Path: {path_name}")
-    logger.info(f"📦 Body: {body.decode('utf-8', errors='ignore')}")
-    return {"status": "ok", "message": "Caught by wildcard"}
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
